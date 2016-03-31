@@ -185,6 +185,46 @@ public class SyncthingRunnable implements Runnable {
                 int ret = 1;
                 try {
                     Thread.sleep(1000); // Wait a second before getting the pid
+                    String pid = getProcID();
+                    if(pid == null)
+                        return;
+
+                    nice = Runtime.getRuntime().exec((useRoot()) ? "su" : "sh");
+                    niceOut = new DataOutputStream(nice.getOutputStream());
+                    //niceOut.writeBytes("set `ps | grep libsyncthing.so`\n");
+                    //niceOut.writeBytes("ionice $2 be 7\n"); // best-effort, low priority
+                    niceOut.writeBytes("ionice "+pid+" be 7\n");
+                    niceOut.writeBytes("exit\n");
+                    log(nice.getErrorStream(), Log.WARN, false);
+                    niceOut.flush();
+                    ret = nice.waitFor();
+                    Log.i(TAG_NICE, "ionice performed on libsyncthing.so");
+                } catch (IOException | InterruptedException e) {
+                    Log.e(TAG_NICE, "Failed to execute ionice binary", e);
+                } finally {
+                    try {
+                        if (niceOut != null) {
+                            niceOut.close();
+                        }
+                    } catch (IOException e) {
+                        Log.w(TAG_NICE, "Failed to close shell stream", e);
+                    }
+                    if (nice != null) {
+                        nice.destroy();
+                    }
+                    if (ret != 0) {
+                        Log.e(TAG_NICE, "Failed to set ionice " + Integer.toString(ret));
+                    }
+                }
+            }
+        }.start();
+        /*new Thread() {
+            public void run() {
+                Process nice = null;
+                DataOutputStream niceOut = null;
+                int ret = 1;
+                try {
+                    Thread.sleep(1000); // Wait a second before getting the pid
                     nice = Runtime.getRuntime().exec((useRoot()) ? "su" : "sh");
                     niceOut = new DataOutputStream(nice.getOutputStream());
                     niceOut.writeBytes("set `ps | grep libsyncthing.so`\n");
@@ -212,7 +252,7 @@ public class SyncthingRunnable implements Runnable {
                     }
                 }
             }
-        }.start();
+        }.start();*/
     }
 
     /**
@@ -221,6 +261,14 @@ public class SyncthingRunnable implements Runnable {
      */
     public void killSyncthing() {
         for (int i = 0; i < 2; i++) {
+                String pid = getProcID();
+                if(pid != null)
+                {
+                    killProcessId(pid, i > 0);
+                }
+
+        }
+        /*for (int i = 0; i < 2; i++) {
             Process ps = null;
             DataOutputStream psOut = null;
             try {
@@ -250,9 +298,51 @@ public class SyncthingRunnable implements Runnable {
                     ps.destroy();
                 }
             }
-        }
+        }*/
     }
+    private String getProcID()
+    {
+        Process ps = null;
+        DataOutputStream psOut = null;
+        String result = null;
+try {
+        ps = Runtime.getRuntime().exec("sh");
+        psOut = new DataOutputStream(ps.getOutputStream());
+        psOut.writeBytes("ps\n");
+        //psOut.writeBytes("ps | grep libsyncthing.so\n");
+        psOut.writeBytes("exit\n");
+        psOut.flush();
+        ps.waitFor();
+        InputStreamReader isr = new InputStreamReader(ps.getInputStream(), "UTF-8");
+        BufferedReader br = new BufferedReader(isr);
+        String id = br.readLine();
+        String[] cut = id.trim().split("\\s+");
 
+        if(cut[1].equals("PID") && cut[7].equals("NAME"))
+        while ((id = br.readLine()) != null) {
+            cut = id.trim().split("\\s+");
+            if(cut[8].contains("libsyncthing.so"))
+            {
+
+                result = cut[1];
+                //killProcessId(cut[1], i > 0);
+            }
+        }
+    }catch (IOException | InterruptedException e) {
+                Log.w(TAG_KILL, "Failed list Syncthing processes", e);
+            } finally {
+                try {
+                    if (psOut != null)
+                        psOut.close();
+                } catch (IOException e) {
+                    Log.w(TAG_KILL, "Failed close the psOut stream", e);
+                }
+                if (ps != null) {
+                    ps.destroy();
+                }
+            }
+        return result;
+    }
     /**
      * Kill a given process ID
      *
