@@ -88,6 +88,12 @@ public class SyncthingRunnable implements Runnable {
 
     @Override
     public void run() {
+        /*String _pid = getProcID;
+        if(_pid != null)
+        {
+
+        }*/
+        killSyncthing();
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(mContext);
         int ret = 1;
         // Make sure Syncthing is executable
@@ -154,7 +160,8 @@ public class SyncthingRunnable implements Runnable {
             if (wakeLock != null)
                 wakeLock.release();
             if (process != null)
-                process.destroy();
+                try{process.destroy();}catch(Exception e){}
+                //process.destroy();
         }
     }
 
@@ -210,7 +217,8 @@ public class SyncthingRunnable implements Runnable {
                         Log.w(TAG_NICE, "Failed to close shell stream", e);
                     }
                     if (nice != null) {
-                        nice.destroy();
+                        try{nice.destroy();}catch(Exception e){}
+                        //nice.destroy();
                     }
                     if (ret != 0) {
                         Log.e(TAG_NICE, "Failed to set ionice " + Integer.toString(ret));
@@ -338,7 +346,8 @@ try {
                     Log.w(TAG_KILL, "Failed close the psOut stream", e);
                 }
                 if (ps != null) {
-                    ps.destroy();
+                    try{ps.destroy();}catch(Exception e){}
+
                 }
             }
         return result;
